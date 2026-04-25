@@ -1,0 +1,24 @@
+{
+  "name": "world-miniapp-payments",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "@worldcoin/minikit-js": "^1.0.0",
+    "next": "14.2.0",
+    "react": "^18",
+    "react-dom": "^18",
+    "pg": "^8.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/pg": "^8",
+    "typescript": "^5"
+  }
+}
