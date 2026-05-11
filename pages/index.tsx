@@ -4,6 +4,8 @@ import Head from 'next/head';
 
 type Step = 'idle' | 'verifying' | 'verified' | 'paying' | 'success' | 'error';
 
+const ALLOWED_TOKENS = [Tokens.USDC, Tokens.WLD];
+
 export default function Home() {
   const [step, setStep] = useState<Step>('idle');
   const [errorMsg, setErrorMsg] = useState('');
@@ -25,7 +27,8 @@ export default function Home() {
     try {
       const { finalPayload } = await MiniKit.commandsAsync.verify({
         action: 'verify-user',
-        verification_level: VerificationLevel.Orb,
+        // Device level = incognito_action, no retinal scan required
+        verification_level: VerificationLevel.Device,
       } as VerifyCommandInput);
       if (finalPayload.status === 'error') throw new Error(finalPayload.details ?? 'Verification failed');
 
@@ -51,11 +54,18 @@ export default function Home() {
     }
     setStep('paying');
     try {
-      const reference = crypto.randomUUID();
+      // reference generated server-side to prevent client-side tampering
+      const refRes = await fetch('/api/initiate-payment', { method: 'POST' });
+      const { reference } = await refRes.json();
+      if (!reference) throw new Error('Failed to generate payment reference');
+
+      const token = Tokens.USDC;
+      if (!ALLOWED_TOKENS.includes(token)) throw new Error('Token no permitido');
+
       const payload: PayCommandInput = {
         reference,
         to: process.env.NEXT_PUBLIC_RECIPIENT_ADDRESS as string,
-        tokens: [{ symbol: Tokens.USDC, token_amount: tokenToDecimals(1, Tokens.USDC).toString() }],
+        tokens: [{ symbol: token, token_amount: tokenToDecimals(1, token).toString() }],
         description: 'Nexus Trust — verified payment',
       };
       const { finalPayload } = await MiniKit.commandsAsync.pay(payload);
@@ -90,7 +100,6 @@ export default function Home() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         padding: '24px', fontFamily: "'Inter', -apple-system, sans-serif", color: '#f0f0f0',
       }}>
-        {/* Logo */}
         <div style={{ marginBottom: 32, textAlign: 'center' }}>
           <div style={{
             width: 72, height: 72, borderRadius: '50%',
@@ -102,7 +111,6 @@ export default function Home() {
           <p style={{ margin: '6px 0 0', fontSize: 13, color: '#8b8b9e' }}>Human-verified payments · World App</p>
         </div>
 
-        {/* Card */}
         <div style={{
           width: '100%', maxWidth: 380,
           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',

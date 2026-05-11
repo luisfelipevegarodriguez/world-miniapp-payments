@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { MiniKit } from '@worldcoin/minikit-js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -11,7 +10,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const appId = process.env.NEXT_PUBLIC_APP_ID as string;
     if (!appId) throw new Error('NEXT_PUBLIC_APP_ID not configured');
 
-    // Verify payment with World backend
     const response = await fetch(
       `https://developer.worldcoin.org/api/v2/minikit/transaction/${payload.transaction_id}?app_id=${appId}`,
       { headers: { Authorization: `Bearer ${process.env.DEV_PORTAL_API_KEY}` } }
@@ -21,8 +19,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (tx.reference !== reference) {
       return res.status(400).json({ success: false, error: 'Reference mismatch' });
     }
-    if (tx.status === 'failed') {
-      return res.status(400).json({ success: false, error: 'Transaction failed on-chain' });
+
+    // Strict status check — pending/failed both rejected
+    if (tx.status !== 'mined') {
+      return res.status(400).json({ success: false, error: `TX not mined — status: ${tx.status}` });
     }
 
     return res.status(200).json({ success: true, transaction_id: payload.transaction_id });

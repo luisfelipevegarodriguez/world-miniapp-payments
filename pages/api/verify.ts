@@ -4,15 +4,21 @@ import { Pool } from 'pg';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-// Ensure nullifier table exists
+// Run once at cold start — not on every request
+let tableReady = false;
 async function ensureTable() {
+  if (tableReady) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS used_nullifiers (
       nullifier_hash TEXT PRIMARY KEY,
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `);
+  tableReady = true;
 }
+
+// Initialize on module load
+ensureTable().catch(console.error);
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -23,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     await ensureTable();
 
-    // Check for duplicate nullifier (anti-sybil)
+    // Anti-sybil: check duplicate nullifier
     const existing = await pool.query(
       'SELECT 1 FROM used_nullifiers WHERE nullifier_hash = $1',
       [payload.nullifier_hash]
@@ -32,15 +38,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ success: false, error: 'Nullifier already used — duplicate human' });
     }
 
-    // Verify with World ID cloud
     const appId = process.env.NEXT_PUBLIC_APP_ID as `app_${string}`;
-    const result: IVerifyResponse = await verifyCloudProof(payload, appId, 'verify-user');
+    // Action ID from env — never hardcoded
+    const actionId = process.env.WORLD_ACTION_ID ?? 'verify-user';
+    const result: IVerifyResponse = await verifyCloudProof(payload, appId, actionId);
 
     if (!result.success) {
       return res.status(400).json({ success: false, error: result.detail ?? 'Proof invalid' });
     }
 
-    // Store nullifier to prevent reuse
     await pool.query(
       'INSERT INTO used_nullifiers (nullifier_hash) VALUES ($1)',
       [payload.nullifier_hash]
