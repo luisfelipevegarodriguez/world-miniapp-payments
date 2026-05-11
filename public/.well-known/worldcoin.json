@@ -1,0 +1,14 @@
+{
+  "$schema": "https://worldcoin.org/schemas/miniapp-discovery/1.0.json",
+  "app_id": "app_staging_placeholder",
+  "name": "Nexus Trust",
+  "description": "Human-verified payments on World Chain",
+  "actions": [
+    {
+      "action": "verify-user",
+      "name": "Verify Identity",
+      "description": "Prove you are a unique human via World ID Orb",
+      "max_accounts_per_user": 1
+    }
+  ]
+}
