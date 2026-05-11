@@ -17,6 +17,18 @@ export default function Home() {
     }
   }, []);
 
+  // Handle background/foreground transitions in World App webview
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.hidden && (step === 'verifying' || step === 'paying')) {
+        setStep('error');
+        setErrorMsg('La app pasó a segundo plano. Vuelve y reintenta la operación.');
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [step]);
+
   const handleVerify = async () => {
     if (!MiniKit.isInstalled()) {
       setErrorMsg('Abre esta app dentro de World App');
@@ -26,7 +38,7 @@ export default function Home() {
     setStep('verifying');
     try {
       const { finalPayload } = await MiniKit.commandsAsync.verify({
-        action: 'verify-user',
+        action: 'nexus-trust-payment-2026',
         // Device level = incognito_action, no retinal scan required
         verification_level: VerificationLevel.Device,
       } as VerifyCommandInput);
@@ -40,8 +52,9 @@ export default function Home() {
       const data = await res.json();
       if (!data.success) throw new Error(data.error ?? 'Backend verify failed');
       setStep('verified');
-    } catch (e: any) {
-      setErrorMsg(e.message);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error desconocido';
+      setErrorMsg(msg);
       setStep('error');
     }
   };
@@ -64,7 +77,8 @@ export default function Home() {
 
       const payload: PayCommandInput = {
         reference,
-        to: process.env.NEXT_PUBLIC_RECIPIENT_ADDRESS as string,
+        // Recipient address sólo existe en backend; el reference ya la encapsula
+        to: undefined as unknown as string,
         tokens: [{ symbol: token, token_amount: tokenToDecimals(1, token).toString() }],
         description: 'Nexus Trust — verified payment',
       };
@@ -80,8 +94,9 @@ export default function Home() {
       if (!data.success) throw new Error(data.error ?? 'Payment not confirmed');
       setTxId(finalPayload.transaction_id ?? reference);
       setStep('success');
-    } catch (e: any) {
-      setErrorMsg(e.message);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error desconocido';
+      setErrorMsg(msg);
       setStep('error');
     }
   };
@@ -121,7 +136,11 @@ export default function Home() {
               <p style={{ fontSize: 14, color: '#a0a0b0', marginBottom: 24, lineHeight: 1.6 }}>
                 Verifica tu humanidad con World ID para desbloquear el pago seguro.
               </p>
-              <button onClick={handleVerify} style={btnStyle('#4f46e5')}>
+              <button
+                onClick={handleVerify}
+                style={btnStyle('#4f46e5')}
+                disabled={step !== 'idle'}
+              >
                 🌐 Verificar con World ID
               </button>
             </>
@@ -137,7 +156,11 @@ export default function Home() {
                 <p style={{ margin: '8px 0 0', fontWeight: 600 }}>Identidad verificada</p>
                 <p style={{ fontSize: 12, color: '#8b8b9e', margin: '4px 0 0' }}>Puedes proceder con el pago</p>
               </div>
-              <button onClick={handlePay} style={btnStyle('#059669')}>
+              <button
+                onClick={handlePay}
+                style={btnStyle('#059669')}
+                disabled={step !== 'verified'}
+              >
                 💳 Pagar 1 USDC
               </button>
             </>
@@ -166,7 +189,16 @@ export default function Home() {
           )}
         </div>
 
-        <p style={{ marginTop: 24, fontSize: 11, color: '#4a4a5e' }}>Powered by World Chain · MiniKit v2</p>
+        <p style={{ marginTop: 16, fontSize: 10, color: '#4a4a5e' }}>
+          Al continuar, aceptas los
+          {' '}
+          <a href="/terms" style={{ color: '#9ca3ff', textDecoration: 'underline' }}>Términos de uso</a>
+          {' '}y la
+          {' '}
+          <a href="/privacy" style={{ color: '#9ca3ff', textDecoration: 'underline' }}>Política de privacidad</a>.
+        </p>
+
+        <p style={{ marginTop: 4, fontSize: 11, color: '#4a4a5e' }}>Powered by World Chain · MiniKit v2</p>
       </div>
     </>
   );
@@ -191,5 +223,6 @@ function btnStyle(bg: string): React.CSSProperties {
     width: '100%', padding: '14px 0', background: bg, color: '#fff',
     border: 'none', borderRadius: 12, fontSize: 15, fontWeight: 600,
     cursor: 'pointer', transition: 'opacity 0.2s',
+    opacity: 1,
   };
 }

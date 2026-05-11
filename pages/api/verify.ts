@@ -1,8 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { verifyCloudProof, IVerifyResponse } from '@worldcoin/minikit-js';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 import { Pool } from 'pg';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+// Upstash rate limit — basic DoS protection
+const redis = Redis.fromEnv();
+const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '60 s'),
+});
 
 // Run once at cold start — not on every request
 let tableReady = false;
@@ -18,7 +27,7 @@ async function ensureTable() {
 }
 
 // Initialize on module load
-ensureTable().catch(console.error);
+ensureTable().catch((e) => console.error('[verify:init]', e instanceof Error ? e.message : e));
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -27,6 +36,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!payload) return res.status(400).json({ success: false, error: 'Missing payload' });
 
   try {
+    // Rate limit per IP
+    const ip = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'anon';
+    const { success } = await ratelimit.limit(ip);
+    if (!success) {
+      return res.status(429).json({ success: false, error: 'Too many requests' });
+    }
+
     await ensureTable();
 
     // Anti-sybil: check duplicate nullifier
@@ -38,7 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ success: false, error: 'Nullifier already used — duplicate human' });
     }
 
-    const appId = process.env.NEXT_PUBLIC_APP_ID as `app_${string}`;
+    const appId = process.env.WORLD_APP_ID as `app_${string}`;
     // Action ID from env — never hardcoded
     const actionId = process.env.WORLD_ACTION_ID ?? 'verify-user';
     const result: IVerifyResponse = await verifyCloudProof(payload, appId, actionId);
@@ -53,8 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     );
 
     return res.status(200).json({ success: true });
-  } catch (e: any) {
-    console.error('[verify]', e);
+  } catch (e) {
+    console.error('[verify]', e instanceof Error ? e.message : e);
     return res.status(500).json({ success: false, error: 'Internal error' });
   }
 }
