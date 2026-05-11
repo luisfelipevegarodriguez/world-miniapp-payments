@@ -1,11 +1,11 @@
 import type { AppProps } from 'next/app';
-import { useEffect } from 'react';
-import { MiniKit } from '@worldcoin/minikit-js';
+import MiniKitProvider from '@/components/MiniKitProvider';
+import '@/styles/globals.css';
 
 export default function App({ Component, pageProps }: AppProps) {
-  useEffect(() => {
-    MiniKit.install();
-  }, []);
-
-  return <Component {...pageProps} />;
+  return (
+    <MiniKitProvider>
+      <Component {...pageProps} />
+    </MiniKitProvider>
+  );
 }
