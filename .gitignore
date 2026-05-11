@@ -1,5 +1,51 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+build/
+
+# Env — NEVER commit secrets
 .env
 .env.local
-.next/
-node_modules/
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# Hardhat
+cache/
+artifacts/
+typechain-types/
+
+# Logs
 *.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Secrets (extra safety)
+*.pem
+*.key
+secrets.json

@@ -1,0 +1,33 @@
+{
+  "name": "Nexus Trust",
+  "short_name": "NexusTrust",
+  "description": "Human-verified P2P payments on World Chain. Zero bots. LATAM financial inclusion.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#4f46e5",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "categories": ["finance", "payments"],
+  "lang": "es",
+  "screenshots": [
+    { "src": "/screenshots/home.png", "sizes": "390x844", "type": "image/png", "form_factor": "narrow" }
+  ],
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "https://nexus-trust.vercel.app"
+    }
+  ],
+  "world_app": {
+    "mini_app": true,
+    "minikit_version": "2.0",
+    "verified_humans_only": true,
+    "supported_chains": [480, 42220],
+    "payment_receiver": "NEXT_PUBLIC_PAYMENT_RECEIVER"
+  }
+}
