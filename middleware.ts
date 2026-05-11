@@ -1,36 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '1 m'),
-  analytics: true,
-});
+// ISO 3166-1 alpha-2 codes blocked: OFAC sanctions + high-risk jurisdictions
+const BLOCKED_COUNTRIES = new Set(['CU', 'IR', 'KP', 'RU', 'SY']);
 
-export async function middleware(req: NextRequest) {
-  const protectedRoutes = ['/api/confirm-payment', '/api/verify', '/api/initiate-payment'];
-  const isProtected = protectedRoutes.some(r => req.nextUrl.pathname.startsWith(r));
+export function middleware(req: NextRequest) {
+  const country = req.geo?.country ?? '';
 
-  if (!isProtected) return NextResponse.next();
+  // Block OFAC-sanctioned countries
+  if (BLOCKED_COUNTRIES.has(country)) {
+    return new NextResponse(
+      JSON.stringify({ error: 'Service not available in your region' }),
+      { status: 451, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 
-  const ip = req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? 'anonymous';
-  const { success, limit, remaining } = await ratelimit.limit(ip);
-
-  if (!success) {
-    return new NextResponse(JSON.stringify({ success: false, error: 'Rate limit exceeded' }), {
-      status: 429,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-RateLimit-Limit': String(limit),
-        'X-RateLimit-Remaining': String(remaining),
-      },
-    });
+  // Enforce TARGET_JURISDICTIONS if set (allowlist mode)
+  const targetJurisdictions = process.env.TARGET_JURISDICTIONS;
+  if (targetJurisdictions && country) {
+    const allowed = new Set(targetJurisdictions.split(',').map(c => c.trim()));
+    if (!allowed.has(country)) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Service not available in your region' }),
+        { status: 451, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ['/api/confirm-payment', '/api/verify', '/api/initiate-payment'],
+  // Apply only to API routes and main page — not to static assets
+  matcher: ['/', '/api/verify', '/api/initiate-payment', '/api/confirm-payment'],
 };
