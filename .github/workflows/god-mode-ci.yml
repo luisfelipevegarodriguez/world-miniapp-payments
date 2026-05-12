@@ -1,0 +1,28 @@
+name: ELITE_2026_PROTOCOL
+on: [push, pull_request]
+
+jobs:
+  ultra_optimize:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npx eslint . --max-warnings=0
+
+      - name: AI Auto-Fix on Failure
+        if: failure()
+        uses: qodo-ai/pr-agent@main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_KEY: ${{ secrets.AI_MASTER_KEY }}
