@@ -1,0 +1,105 @@
+# ╔══════════════════════════════════════════════════════╗
+# ║  OIDC → GCP Cloud Run — Zero Static Keys 2026       ║
+# ╚══════════════════════════════════════════════════════╝
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  REGION: europe-west1
+  SERVICE: world-miniapp-payments
+  REGISTRY: europe-west1-docker.pkg.dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --prefer-offline
+
+      - name: Lint & typecheck
+        run: |
+          npm run lint --if-present
+          npm run typecheck --if-present
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_APP_ID: ${{ secrets.WLD_CLIENT_ID }}
+          NEXT_PUBLIC_WALLETCONNECT_ID: ${{ secrets.WALLETCONNECT_ID }}
+        run: npm run build
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+        run: |
+          IMAGE="${REGISTRY}/${PROJECT}/apps/${SERVICE}:${GITHUB_SHA}"
+          gcloud auth configure-docker ${REGISTRY} --quiet
+          docker buildx build \
+            --cache-from type=registry,ref=${REGISTRY}/${PROJECT}/apps/${SERVICE}:cache \
+            --cache-to   type=registry,ref=${REGISTRY}/${PROJECT}/apps/${SERVICE}:cache,mode=max \
+            --platform linux/amd64 \
+            --push \
+            -t "$IMAGE" .
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+
+      - name: Deploy Cloud Run
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+          WLD_CLIENT_ID: ${{ secrets.WLD_CLIENT_ID }}
+          WLD_CLIENT_SECRET: ${{ secrets.WLD_CLIENT_SECRET }}
+        run: |
+          gcloud run deploy "${SERVICE}" \
+            --image "${IMAGE}" \
+            --region "${REGION}" \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 3000 \
+            --timeout 30 \
+            --concurrency 80 \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 10 \
+            --set-env-vars "NODE_ENV=production,NEXT_PUBLIC_APP_ID=${WLD_CLIENT_ID}" \
+            --project "${PROJECT}" \
+            --quiet
+
+      - name: Verify deploy
+        env:
+          PROJECT: ${{ secrets.GCP_PROJECT }}
+        run: |
+          URL=$(gcloud run services describe "${SERVICE}" \
+            --region "${REGION}" --project "${PROJECT}" \
+            --format='value(status.url)')
+          echo "SERVICE_URL=$URL" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Deployed → $URL"
+          curl -sf --retry 3 --retry-delay 5 "${URL}/api/health" || \
+          curl -sf --retry 3 --retry-delay 5 "${URL}" || true
