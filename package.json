@@ -27,7 +27,7 @@
     "postcss": "8.5.32"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-ethers": "^4.2.2",
     "@types/node": "^20",
     "@types/pg": "^8",
     "@types/react": "^18",
