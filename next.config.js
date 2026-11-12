@@ -3,10 +3,8 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,
-  experimental: {
-    // Required for MiniKit 2.0 on Vercel Edge
-    serverComponentsExternalPackages: ['pg'],
-  },
+  // Next.js 15 moved this out of `experimental`. Keeps `pg` external on the server bundle.
+  serverExternalPackages: ['pg'],
   async headers() {
     return [
       {

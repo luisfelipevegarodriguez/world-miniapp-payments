@@ -89,3 +89,8 @@ ES MX CO AR PE CL EC GT HN BO PY UY BR PT
 - Non-custodial: we never hold user funds
 - GDPR/CCPA compliant
 - Governing law: Spain (EU), Madrid courts
+
+## Repos relacionados
+
+- [nexus-trust-v4](https://github.com/luisfelipevegarodriguez/nexus-trust-v4) — histórico; su contenido se integra aquí.
+- [worldid-max-stack-2026](https://github.com/luisfelipevegarodriguez/worldid-max-stack-2026) — paraguas World ID.
