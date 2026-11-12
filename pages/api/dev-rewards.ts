@@ -5,12 +5,15 @@
  * Minimum: 10K verified unique humans
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
+import { getPool } from '@/lib/db';
+import { notConfiguredBody } from '@/lib/config-status';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 const TARGET = 10_000; // minimum for Dev Rewards
 
 export default async function handler(_req: NextApiRequest, res: NextApiResponse) {
+  const pool = getPool();
+  if (!pool) return res.status(503).json(notConfiguredBody());
+
   const [usersRes, weeklyTxRes, retentionRes] = await Promise.all([
     pool.query(`SELECT COUNT(DISTINCT nullifier_hash) as total FROM used_nullifiers`),
     pool.query(`SELECT COUNT(*) as count FROM payments WHERE status='completed' AND created_at > NOW() - INTERVAL '7 days'`),

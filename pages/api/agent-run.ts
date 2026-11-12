@@ -1,27 +1,33 @@
 /**
- * Nexus Trust Brain Agent — Vercel Cron every 10 min
- * vercel.json: { "crons": [{ "path": "/api/agent-run", "schedule": "*/10 * * * *" }] }
+ * Nexus Trust Brain Agent.
+ * Hobby cron runs once per day. Schedule is in vercel.json.
+ * Authorization accepts AGENT_CRON_SECRET or the Vercel CRON_SECRET.
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Pool } from 'pg';
 import { log } from '@/lib/logger';
+import { getPool } from '@/lib/db';
+import { notConfiguredBody, readEnv } from '@/lib/config-status';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const AGENT_SECRET = process.env.AGENT_CRON_SECRET;
-const GROK_API_KEY = process.env.GROK_API_KEY;
-const DEFI_BASE = process.env.DEFILLAAMA_BASE_URL ?? 'https://yields.llama.fi';
+const DEFI_BASE = process.env.DEFILLAMA_BASE_URL ?? 'https://yields.llama.fi';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.headers.authorization !== `Bearer ${AGENT_SECRET}`) return res.status(401).end();
+  const agentSecret = readEnv('AGENT_CRON_SECRET', 'CRON_SECRET');
+  if (!agentSecret || req.headers.authorization !== `Bearer ${agentSecret}`) {
+    return res.status(401).end();
+  }
+
+  const pool = getPool();
+  if (!pool) return res.status(503).json(notConfiguredBody());
+  const grokApiKey = readEnv('GROK_API_KEY');
 
   const started = Date.now();
   try {
     const [yieldSignals, grokInsights] = await Promise.all([
       fetchDeFiLlamaYields(),
-      fetchGrokInsights(),
+      fetchGrokInsights(grokApiKey),
     ]);
 
-    const actions = yieldSignals.map((s: YieldSignal) => ({
+    const actions: Array<Record<string, unknown>> = yieldSignals.map((s: YieldSignal) => ({
       type: 'yield_signal',
       protocol: s.project,
       apy: s.apy,
@@ -66,12 +72,12 @@ async function fetchDeFiLlamaYields(): Promise<YieldSignal[]> {
     .slice(0, 10);
 }
 
-async function fetchGrokInsights(): Promise<Record<string, unknown> | null> {
-  if (!GROK_API_KEY) return null;
+async function fetchGrokInsights(grokApiKey: string | undefined): Promise<Record<string, unknown> | null> {
+  if (!grokApiKey) return null;
   try {
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${GROK_API_KEY}`, 'Content-Type': 'application/json' },
+      headers: { 'Authorization': `Bearer ${grokApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'grok-3',
         messages: [{

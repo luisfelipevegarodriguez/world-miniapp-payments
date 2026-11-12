@@ -59,7 +59,7 @@ export async function requestHumanApproval(
     signal: JSON.stringify({ action, amount, ts: Date.now() }),
   });
 
-  if (result.finalPayload.status === 'success') {
+  if (result.finalPayload.status === 'success' && 'proof' in result.finalPayload) {
     return {
       approved: true,
       proof: result.finalPayload.proof,

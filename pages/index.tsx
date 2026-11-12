@@ -1,16 +1,34 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import type { GetServerSideProps } from 'next';
 import { isMiniKitAvailable, triggerVerify, triggerPay } from '@/lib/minikit';
 import WorldIDWidget from '@/components/WorldIDWidget';
+import ConfigStatus from '@/components/ConfigStatus';
 import type { ISuccessResult } from '@worldcoin/idkit';
-import { STABLECOINS } from '@/lib/stablecoins';
+import { SUPPORTED_STABLECOINS as STABLECOINS } from '@/lib/stablecoins';
+import { getConfigStatus, type PublicConfigStatus } from '@/lib/config-status';
 
 type Status = 'idle' | 'verifying' | 'verified' | 'paying' | 'done' | 'error';
 
 const AMOUNT_PRESETS = [1, 5, 10, 25, 50];
 const OVERSIGHT_THRESHOLD = 50; // USDC — requiere aprobación humana
 
-export default function Home() {
+export default function Home({ config }: { config: PublicConfigStatus }) {
+  if (!config.configured) {
+    return (
+      <>
+        <Head>
+          <title>Nexus Trust — Status</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+        </Head>
+        <ConfigStatus config={config} />
+      </>
+    );
+  }
+  return <PaymentHome />;
+}
+
+function PaymentHome() {
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
   const [nullifier, setNullifier] = useState('');
@@ -218,7 +236,7 @@ export default function Home() {
 
         {/* Actions */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {status === 'idle' || status === 'error' ? (
+          {status === 'idle' || status === 'error' || status === 'verifying' ? (
             inWorldApp ? (
               <button onClick={() => handleVerify()} disabled={isLoading}
                 style={{
@@ -234,7 +252,7 @@ export default function Home() {
             )
           ) : null}
 
-          {(status === 'verified' || status === 'done') && (
+          {(status === 'verified' || status === 'done' || status === 'paying') && (
             <>
               <button onClick={handlePay} disabled={isLoading || status === 'done'}
                 style={{
@@ -277,10 +295,14 @@ export default function Home() {
           <a href="/terms" style={{ color: '#444' }}>Términos</a>
           <a href="/privacy" style={{ color: '#444' }}>Privacidad</a>
           <a href="/api/metrics" style={{ color: '#444' }}>Métricas</a>
-          <a href="/api/health" style={{ color: '#444' }}>Status</a>
+          <a href="/status" style={{ color: '#444' }}>Status</a>
           <a href="https://world.org" target="_blank" rel="noopener" style={{ color: '#444' }}>World</a>
         </div>
       </main>
     </>
   );
 }
+
+export const getServerSideProps: GetServerSideProps<{ config: PublicConfigStatus }> = async () => {
+  return { props: { config: getConfigStatus() } };
+};
