@@ -5,7 +5,9 @@ import type { NextRequest } from 'next/server';
 const BLOCKED_COUNTRIES = new Set(['CU', 'IR', 'KP', 'RU', 'SY']);
 
 export function middleware(req: NextRequest) {
-  const country = req.geo?.country ?? '';
+  // Next.js 15 removed NextRequest.geo. On Vercel (including Hobby) the country
+  // still arrives as this header, which is what `geo.country` used to read.
+  const country = req.headers.get('x-vercel-ip-country') ?? '';
 
   // Block OFAC-sanctioned countries
   if (BLOCKED_COUNTRIES.has(country)) {
