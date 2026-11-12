@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { ratelimit } from '@/lib/ratelimit';
+import { getRatelimit } from '@/lib/ratelimit';
+import { getConfigStatus, notConfiguredBody } from '@/lib/config-status';
 
 /**
  * Nexus Trust — Grok Brain Orchestrator
@@ -9,15 +10,20 @@ import { ratelimit } from '@/lib/ratelimit';
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
+  if (!getConfigStatus().configured) {
+    return res.status(503).json(notConfiguredBody());
+  }
 
-  // Identificador: prioriza World ID header sobre IP para rate limit
+  const limiter = getRatelimit();
+  if (!limiter) return res.status(503).json(notConfiguredBody());
+
   const id =
     (req.headers['x-world-id'] as string) ??
     (req.headers['x-forwarded-for'] as string) ??
     req.socket.remoteAddress ??
     'anon';
 
-  const { success, limit, remaining, reset } = await ratelimit.limit(id);
+  const { success, limit, remaining, reset } = await limiter.limit(id);
 
   res.setHeader('X-RateLimit-Limit', limit);
   res.setHeader('X-RateLimit-Remaining', remaining);

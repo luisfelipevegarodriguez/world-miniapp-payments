@@ -5,16 +5,21 @@
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { verifyCloudProof, IVerifyResponse } from '@worldcoin/minikit-js';
-import { logger } from '@/lib/logger';
-import { ratelimit } from '@/lib/ratelimit';
-
-const APP_ID = process.env.NEXT_PUBLIC_WORLD_APP_ID as `app_${string}`;
+import { log } from '@/lib/logger';
+import { getRatelimit } from '@/lib/ratelimit';
+import { getConfigStatus, notConfiguredBody, readEnv } from '@/lib/config-status';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).end();
+  if (!getConfigStatus().configured) {
+    return res.status(503).json(notConfiguredBody());
+  }
+
+  const limiter = getRatelimit();
+  if (!limiter) return res.status(503).json(notConfiguredBody());
 
   const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? 'unknown';
-  const { success } = await ratelimit.limit(ip);
+  const { success } = await limiter.limit(ip);
   if (!success) return res.status(429).json({ error: 'rate_limited' });
 
   const { proof, nullifier_hash, merkle_root, verification_level, action, signal } = req.body ?? {};
@@ -24,25 +29,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const appId = readEnv('NEXT_PUBLIC_WORLD_APP_ID', 'WORLD_APP_ID', 'NEXT_PUBLIC_APP_ID') as `app_${string}`;
     const verifyRes: IVerifyResponse = await verifyCloudProof(
       { proof, nullifier_hash, merkle_root, verification_level },
-      APP_ID,
+      appId,
       action,
       signal
     );
 
     if (!verifyRes.success) {
-      logger.warn({ action, reason: verifyRes.detail }, 'agent_verify_failed');
+      log('WARN', 'agent_verify_failed', { action, reason: verifyRes.detail });
       return res.status(400).json({ error: verifyRes.detail, code: verifyRes.code });
     }
 
-    // Registrar aprobación humana para audit trail (Vercel Workflow SDK compatible)
-    logger.info({
-      nullifier: nullifier_hash.slice(0, 16),
+    log('INFO', 'human_approval_granted', {
+      nullifier: String(nullifier_hash).slice(0, 16),
       action,
       signal,
       ts: new Date().toISOString(),
-    }, 'human_approval_granted');
+    });
 
     return res.status(200).json({
       success: true,
@@ -53,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       workflow_continue: true,
     });
   } catch (err) {
-    logger.error({ err }, 'agent_verify_error');
+    log('ERROR', 'agent_verify_error', { err: err instanceof Error ? err.message : 'internal_error' });
     return res.status(500).json({ error: 'internal_error' });
   }
 }

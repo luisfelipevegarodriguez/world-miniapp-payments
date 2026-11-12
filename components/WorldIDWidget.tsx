@@ -12,8 +12,16 @@ interface Props {
 }
 
 export default function WorldIDWidget({ onSuccess, action, signal }: Props) {
-  const appId = process.env.NEXT_PUBLIC_WORLD_APP_ID as `app_${string}`;
+  const configuredAppId = process.env.NEXT_PUBLIC_WORLD_APP_ID ?? '';
   const actionId = action ?? process.env.NEXT_PUBLIC_WORLD_ACTION_ID ?? 'nexus-trust-payment-2026';
+  if (!configuredAppId.startsWith('app_')) {
+    return (
+      <p style={{ color: '#fbbf24', fontSize: 14, textAlign: 'center', margin: 0 }}>
+        World ID is not configured. <a href="/status" style={{ color: '#a5b4fc' }}>Status</a>
+      </p>
+    );
+  }
+  const appId = configuredAppId as `app_${string}`;
 
   return (
     <IDKitWidget
@@ -23,7 +31,7 @@ export default function WorldIDWidget({ onSuccess, action, signal }: Props) {
       verification_level={VerificationLevel.Orb}
       onSuccess={onSuccess}
     >
-      {({ open }) => (
+      {({ open }: { open: () => void }) => (
         <button
           onClick={open}
           style={{

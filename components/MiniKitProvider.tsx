@@ -10,7 +10,9 @@ interface Props { children: ReactNode; }
 
 export default function MiniKitProvider({ children }: Props) {
   useEffect(() => {
-    MiniKit.install(process.env.NEXT_PUBLIC_WORLD_APP_ID);
+    const appId = process.env.NEXT_PUBLIC_WORLD_APP_ID;
+    if (!appId) return;
+    MiniKit.install(appId);
   }, []);
   return <>{children}</>;
 }

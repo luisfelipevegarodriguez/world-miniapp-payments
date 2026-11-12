@@ -4,10 +4,9 @@
  * Alineado con guías World: no chance-based mechanics sin disclosure
  */
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { ratelimitRead } from '@/lib/ratelimit';
-import { Pool } from 'pg';
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+import { getRatelimitRead } from '@/lib/ratelimit';
+import { getPool } from '@/lib/db';
+import { getConfigStatus, notConfiguredBody } from '@/lib/config-status';
 
 const MISSIONS: Mission[] = [
   { id: 'first_verify', title: '🌍 Verifica tu humanidad', xp: 100, type: 'onboarding', target: 1 },
@@ -21,14 +20,22 @@ const MISSIONS: Mission[] = [
 interface Mission { id: string; title: string; xp: number; type: string; target: number; }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!getConfigStatus().configured) {
+    return res.status(503).json(notConfiguredBody());
+  }
+
   const nullifier = req.headers['x-world-id'] as string;
   if (!nullifier) return res.status(400).json({ error: 'Missing x-world-id' });
 
-  const { success } = await ratelimitRead.limit(nullifier);
+  const limiter = getRatelimitRead();
+  if (!limiter) return res.status(503).json(notConfiguredBody());
+  const { success } = await limiter.limit(nullifier);
   if (!success) return res.status(429).json({ error: 'Too many requests' });
 
+  const pool = getPool();
+  if (!pool) return res.status(503).json(notConfiguredBody());
+
   if (req.method === 'GET') {
-    // Return missions with progress for this human
     const rows = await pool.query(
       `SELECT mission_id, progress, completed_at FROM user_missions WHERE nullifier_hash = $1`,
       [nullifier]
