@@ -1,0 +1,59 @@
+name: Bug
+description: Fallo reproducible en la app, un endpoint o el build
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe el fallo para que se pueda reproducir. No pegues secretos, tokens, claves privadas ni volcados de `.env`.
+  - type: textarea
+    id: what
+    attributes:
+      label: Qué ocurre
+      description: Qué ves y qué esperabas.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducir
+      description: Comandos, ruta y datos de ejemplo sin secretos.
+      placeholder: |
+        1. npm ci
+        2. npm run dev
+        3. Abrir /
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportamiento esperado
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Entorno
+      description: Node, local o Vercel, y si el entorno de variables estaba vacío.
+      placeholder: Node 22, local, sin .env.local
+    validations:
+      required: true
+  - type: dropdown
+    id: payments
+    attributes:
+      label: ¿Ocurre con los pagos desactivados (entorno vacío)?
+      options:
+        - "Sí, con el entorno vacío"
+        - "No, solo con la configuración completa"
+        - "No lo he comprobado"
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Comprobaciones
+      options:
+        - label: No incluí secretos, tokens ni claves privadas
+          required: true

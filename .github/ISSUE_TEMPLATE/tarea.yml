@@ -1,0 +1,42 @@
+name: Tarea
+description: Cambio acotado de código, docs o configuración
+title: "tarea: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Una tarea, un resultado. No pegues secretos ni pidas activar pagos, regiones extra o servicios de pago.
+  - type: textarea
+    id: goal
+    attributes:
+      label: Objetivo
+      description: Qué tiene que quedar hecho cuando la tarea se cierre.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Contexto
+      description: Archivos, rutas o comportamiento actual que importan.
+    validations:
+      required: false
+  - type: textarea
+    id: done
+    attributes:
+      label: Criterio de aceptación
+      description: Cómo se comprueba. Incluye comandos si aplica (`npm run typecheck`, `npx eslint . --ignore-pattern .next`, `npm run build`).
+    validations:
+      required: true
+  - type: checkboxes
+    id: constraints
+    attributes:
+      label: Restricciones
+      options:
+        - label: Se mantiene Vercel Hobby, la región `gru1` y el cron como máximo una vez al día
+          required: true
+        - label: No se añaden servicios de pago ni se activan los pagos por defecto
+          required: true
+        - label: No se commitean secretos
+          required: true
